@@ -8,7 +8,9 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"image/jpeg"
 	"image/png"
+	"io"
 )
 
 // EncodeNRGBA encodes a given string into the input image using least significant bit encryption (LSB steganography)
@@ -21,7 +23,7 @@ import (
 	Output:
 		bytes buffer ( io.writter ) to create file, or send data.
 */
-func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byte) error {
+func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byte, format ImageFormat) error {
 
 	var messageLength = uint32(len(message))
 
@@ -55,7 +57,7 @@ func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byt
 			bit, ok = <-ch
 			if !ok { // if we don't have any more bits left in our message
 				rgbImage.SetNRGBA(x, y, c)
-				png.Encode(writeBuffer, rgbImage)
+				encodeImage(writeBuffer, rgbImage, format)
 				// return *writeBuffer, nil
 			}
 			setLSB(&c.R, bit)
@@ -64,7 +66,7 @@ func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byt
 			bit, ok = <-ch
 			if !ok {
 				rgbImage.SetNRGBA(x, y, c)
-				png.Encode(writeBuffer, rgbImage)
+				encodeImage(writeBuffer, rgbImage, format)
 				return nil
 			}
 			setLSB(&c.G, bit)
@@ -73,7 +75,7 @@ func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byt
 			bit, ok = <-ch
 			if !ok {
 				rgbImage.SetNRGBA(x, y, c)
-				png.Encode(writeBuffer, rgbImage)
+				encodeImage(writeBuffer, rgbImage, format)
 				return nil
 			}
 			setLSB(&c.B, bit)
@@ -82,9 +84,33 @@ func EncodeNRGBA(writeBuffer *bytes.Buffer, rgbImage *image.NRGBA, message []byt
 		}
 	}
 
-	err := png.Encode(writeBuffer, rgbImage)
-	fmt.Println("err")
-	return err
+	switch format {
+	case JPEG:
+		err := jpeg.Encode(writeBuffer, rgbImage, nil)
+		return err
+	default:
+		err := png.Encode(writeBuffer, rgbImage)
+		fmt.Println("err")
+		return err
+	}
+}
+
+type ImageFormat int
+
+const (
+	PNG ImageFormat = iota
+	JPEG
+)
+
+func encodeImage(w io.Writer, img image.Image, format ImageFormat) error {
+	switch format {
+	case PNG:
+		return png.Encode(w, img)
+	case JPEG:
+		return jpeg.Encode(w, img, nil)
+	default:
+		return errors.New("unsupported image format")
+	}
 }
 
 // Encode encodes a given string into the input image using least significant bit encryption (LSB steganography)
@@ -102,8 +128,16 @@ func Encode(writeBuffer *bytes.Buffer, pictureInputFile image.Image, message []b
 
 	rgbImage := imageToNRGBA(pictureInputFile)
 
-	return EncodeNRGBA(writeBuffer, rgbImage, message)
+	return EncodeNRGBA(writeBuffer, rgbImage, message, PNG)
 
+}
+
+// EncodeToFormat encodes a given string into the input image using least significant bit encryption (LSB steganography)
+// then the image is encoded to a given format
+func EncodeToFormat(writeBuffer *bytes.Buffer, pictureInputFile image.Image, message []byte, format ImageFormat) error {
+	rgbImage := imageToNRGBA(pictureInputFile)
+
+	return EncodeNRGBA(writeBuffer, rgbImage, message, format)
 }
 
 // decodeNRGBA gets messages from pictures using LSB steganography, decode the message from the picture and return it as a sequence of bytes

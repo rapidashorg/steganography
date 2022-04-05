@@ -154,7 +154,7 @@ func TestEncodeDecodeGeneratedSmallImage(t *testing.T) {
 	}
 
 	w := new(bytes.Buffer)
-	err := EncodeNRGBA(w, newimg, []uint8{84, 84, 84}) // Encode the message into the image file
+	err := EncodeNRGBA(w, newimg, []uint8{84, 84, 84}, PNG) // Encode the message into the image file
 	if err != nil {
 		log.Printf("Error Encoding file %v", err)
 		t.FailNow()
